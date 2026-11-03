@@ -31,4 +31,8 @@ class BaseOpenAIClient(AIClient, ABC):
         # Make validation for `api_key` (the same as in parent class)
         # Call to __init__ of super class
         # The `api_key` should be formatted according to Open AI specification
-        raise NotImplementedError
+        super().__init__(endpoint=endpoint,
+                          model_name=model_name, 
+                          api_key=api_key,
+                          system_prompt=system_prompt)
+        

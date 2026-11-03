@@ -43,7 +43,25 @@ class CustomOpenAIClient(BaseOpenAIClient):
         # - Parse response
         # - Print response to console
         # - Return ASSISTANT message
-        raise NotImplementedError
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self._api_key}"
+        }
+        messages = messages[::]
+        system_promt = Message(role=Role.SYSTEM, content=self._system_prompt)
+        messages.insert(0, system_promt)
+        messages = list(map(lambda message: message.to_dict(), messages))
+        request_body = json.dumps({
+            "model": self._model_name,
+            "messages": messages
+        })
+        response = requests.post(self._endpoint, headers=headers, data=request_body)
+        response.raise_for_status()
+        response_json = response.json()
+        ai_answer = response_json.get("choices")[0].get("message").get("content")
+        print(f"AI: {ai_answer}")
+        ai_message = Message(role=Role.ASSISTANT, content=ai_answer)
+        return ai_message
 
     async def stream_response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -73,4 +91,41 @@ class CustomOpenAIClient(BaseOpenAIClient):
         # - Parse response
         # - Print chunks to console
         # - Return ASSISTANT message
-        raise NotImplementedError
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self._api_key}"
+        }
+        messages = messages[::]
+        system_promt = Message(role=Role.SYSTEM, content=self._system_prompt)
+        messages.insert(0, system_promt)
+        messages = list(map(lambda message: message.to_dict(), messages))
+        request_body = json.dumps({
+            "model": self._model_name,
+            "messages": messages,
+            "stream": True
+        })
+        ai_answer = ""
+        async with aiohttp.ClientSession() as session:
+            async with session.post(self._endpoint, headers=headers, data=request_body) as response:
+                response.raise_for_status()
+                print("AI:", end="")
+                async for chunk in response.content:
+                    text_line = chunk.decode("utf-8").strip()
+                    if not text_line:
+                        continue
+                    if text_line.startswith("data: "):
+                        content = text_line[6:]
+                        if content == "[DONE]":
+                            print()
+                            break
+                        try:
+                            data_json = json.loads(content)
+                            ai_content = data_json.get("choices")[0].get("delta").get("content") or ""
+                            ai_answer += ai_content
+                            print(ai_content, flush=True, end="")
+
+                        except json.JSONDecodeError as e:
+                            print("Some isssue occured")
+                            raise e
+        return Message(role=Role.ASSISTANT, content=ai_answer)
+

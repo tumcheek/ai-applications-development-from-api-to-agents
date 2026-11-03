@@ -34,7 +34,9 @@ class OpenAIClient(BaseOpenAIClient):
         # Add OpenAI and AsyncOpenAI clients https://github.com/openai/openai-python?tab=readme-ov-file#usage
         # (In readme you can find samples with both of these clients)
         # Useful link with request/response samples https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
-        raise NotImplementedError
+        super().__init__(endpoint, model_name, system_prompt, api_key)
+        self.client = OpenAI(api_key=api_key)
+        self.async_client = AsyncOpenAI(api_key=api_key)
 
     def response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -56,7 +58,18 @@ class OpenAIClient(BaseOpenAIClient):
         # - Call client
         # - Print response to console
         # - Return ASSISTANT message
-        raise NotImplementedError
+        messages = messages[::]
+        system_promt = Message(role=Role.SYSTEM, content=self._system_prompt)
+        messages.insert(0, system_promt)
+        messages = list(map(lambda message: message.to_dict(), messages))
+        completion = self.client.chat.completions.create(
+            model=self._model_name,
+            messages=messages
+        )
+        resonse = completion.choices[0].message.content
+        print(f'AI: {resonse}')
+        ai_message = Message(role=Role.ASSISTANT, content=resonse)
+        return ai_message
 
     async def stream_response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -82,4 +95,22 @@ class OpenAIClient(BaseOpenAIClient):
         # - Handle stream with chunks
         # - Print response to console
         # - Return ASSISTANT message
-        raise NotImplementedError
+        messages = messages[::]
+        system_promt = Message(role=Role.SYSTEM, content=self._system_prompt)
+        messages.insert(0, system_promt)
+        messages = list(map(lambda message: message.to_dict(), messages))
+        ai_response = ""
+        completion = await self.async_client.chat.completions.create(
+            model=self._model_name,
+            messages=messages,
+            stream=True
+        )
+        print("AI:", end="")
+        async for chunk in completion:
+            finish_reason = chunk.choices[0].finish_reason
+            content = chunk.choices[0].delta.content or ""
+            ai_response += content
+            print_end = "" if not finish_reason == "stop" else "\n"
+            print(content, end=print_end, flush=True)
+        ai_message = Message(role=Role.ASSISTANT, content=ai_response)
+        return ai_message

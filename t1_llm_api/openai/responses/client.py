@@ -33,7 +33,12 @@ class OpenAIResponsesClient(BaseOpenAIClient):
         # Call to __init__ of super class
         # Add OpenAI and AsyncOpenAI clients https://github.com/openai/openai-python?tab=readme-ov-file#usage
         # (In readme you can find samples with both of these clients)
-        raise NotImplementedError
+        super().__init__(endpoint=endpoint, 
+                         model_name=model_name, 
+                         system_prompt=system_prompt, 
+                         api_key=api_key)
+        self.client = OpenAI(api_key=api_key)
+        self.async_client = AsyncOpenAI(api_key=api_key)
 
     def response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -55,7 +60,14 @@ class OpenAIResponsesClient(BaseOpenAIClient):
         # - Call client
         # - Print response to console
         # - Return ASSISTANT message
-        raise NotImplementedError
+        input_messages = list(map(lambda ms: ms.to_dict(), messages))
+        response = self.client.responses.create(
+            model=self._model_name,
+            instructions=self._system_prompt,
+            input=input_messages
+        )
+        print(f'AI:{response.output_text}')
+        return Message(role=Role.ASSISTANT, content=response.output_text)
 
     async def stream_response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -81,4 +93,18 @@ class OpenAIResponsesClient(BaseOpenAIClient):
         # - Handle stream with events
         # - Print response to console
         # - Return ASSISTANT message
-        raise NotImplementedError
+        input_messages = list(map(lambda ms: ms.to_dict(), messages))
+        stream = await self.async_client.responses.create(
+            model=self._model_name,
+            instructions=self._system_prompt,
+            input=input_messages,
+            stream=True
+        )
+        ai_content = ""
+        print("AI:",end="")
+        async for event in stream:
+            if event.type == "response.output_text.delta":
+                ai_content += event.delta
+                print(event.delta, flush=True, end="")
+        print()
+        return Message(role=Role.ASSISTANT, content=ai_content)
