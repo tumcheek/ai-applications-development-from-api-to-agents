@@ -44,7 +44,29 @@ class CustomAnthropicAIClient(AIClient):
         # - Parse response
         # - Print response to console
         # - Return ASSISTANT message
-        raise NotImplementedError
+        headers = {
+            "x-api-key": self._api_key,
+            "anthropic-version": "2026-10-21",
+            "content-type": "application/json"
+        }
+        messages = list(map(lambda ms: ms.to_dict(), messages))
+        request_body = json.dumps(
+            {
+                "model": self._model_name,
+                "max_tokens": 1024,
+                "messages": messages,
+                "system": self._system_prompt
+            }
+        )
+        response = requests.post(url=self._endpoint, data=request_body, headers=headers)
+        response.raise_for_status()
+        response_json = response.json()
+        ai_answer = "-"
+        for content in response_json.get("content"):
+            if content.get("type") == "text":
+                ai_answer = content.get("text")   
+        print(f"AI: {ai_answer}")
+        return Message(role=Role.ASSISTANT, content=ai_answer)
 
     async def stream_response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -75,5 +97,42 @@ class CustomAnthropicAIClient(AIClient):
         # - Parse response
         # - Print chunks to console
         # - Return ASSISTANT message
-        raise NotImplementedError
+        headers = {
+            "x-api-key": self._api_key,
+            "anthropic-version": "2026-10-21",
+            "content-type": "application/json"
+        }
+        messages = list(map(lambda ms: ms.to_dict(), messages))
+        request_body = json.dumps(
+            {
+                "model": self._model_name,
+                "max_tokens": 1024,
+                "messages": messages,
+                "system": self._system_prompt,
+                "stream": True
+
+            }
+        )
+        async with aiohttp.ClientSession() as sesion:
+            async with sesion.post(self._endpoint, data=request_body, headers=headers) as response:
+                response.raise_for_status()
+                event = None
+                ai_content = ""
+                print("AI:", end="")
+                async for line in response.content:
+                    text_line = line.decode("utf-8").strip()
+                    if text_line.startswith("event: "):
+                        event = text_line[7:]
+                    elif text_line.startswith("data: "):
+                        if event == "content_block_delta":
+                            content_json = json.loads(text_line[6:])
+                            content_delta = content_json.get("delta").get("text") or ""
+                            ai_content += content_delta
+                            print(content_delta, flush=True, end="")
+                    elif not text_line:
+                        event = None
+
+                print()
+
+        return Message(role=Role.ASSISTANT, content=ai_content)
 

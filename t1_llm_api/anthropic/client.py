@@ -35,7 +35,9 @@ class AnthropicAIClient(AIClient):
         # Useful links with request/response samples:
         #   - https://docs.anthropic.com/en/api/overview
         #   - https://docs.anthropic.com/en/api/messages
-        raise NotImplementedError
+        super().__init__(endpoint, model_name, api_key, system_prompt)
+        self.client = Anthropic(api_key=self._api_key)
+        self.async_client = AsyncAnthropic(api_key=self._api_key)
 
     def response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -58,7 +60,19 @@ class AnthropicAIClient(AIClient):
         # - Call client
         # - Print response to console
         # - Return ASSISTANT message
-        raise NotImplementedError
+        messages = list(map(lambda ms: ms.to_dict(), messages))
+        message = self.client.messages.create(
+             max_tokens=1024,
+             messages=messages,
+             system=self._system_prompt,
+             model=self._model_name
+        )
+        ai_answer = ""
+        for content in message.content:
+            if content.type == "text":
+                ai_answer = content.text
+        print(f"AI: {ai_answer}")
+        return Message(role=Role.ASSISTANT, content=ai_answer)
 
     async def stream_response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -84,4 +98,22 @@ class AnthropicAIClient(AIClient):
         # - Handle stream with chunks
         # - Print response to console
         # - Return ASSISTANT message
-        raise NotImplementedError
+        messages = list(map(lambda ms: ms.to_dict(), messages))
+        stream = await self.async_client.messages.create(
+             max_tokens=1024,
+             messages=messages,
+             system=self._system_prompt,
+             model=self._model_name,
+             stream=True
+        )
+        ai_content = ''
+        print("AI:", end="")
+        async for event in stream:
+            if event.type == "content_block_delta":
+                delta_text = event.delta.text if event.delta.type == "text_delta" else ""
+                ai_content += delta_text
+                print(delta_text, end="", flush=True)
+        print()
+
+        return Message(role=Role.ASSISTANT, content=ai_content)
+
