@@ -34,7 +34,7 @@ ANTHROPIC_SONNET_MODEL = "claude-sonnet-5"
 ANTHROPIC_HAIKU_MODEL = "claude-haiku-4-5"
 
 # Google Gemini API configuration
-GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
+GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions"
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
 GEMINI_FLASH_MODEL = "gemini-3-flash-preview"
 

@@ -31,7 +31,8 @@ class GeminiAIClient(AIClient):
         #TODO:
         # Call to __init__ of super class
         # Add genai.Client https://ai.google.dev/gemini-api/docs/text-generation#python_4
-        raise NotImplementedError
+        super().__init__(endpoint, model_name, api_key, system_prompt)
+        self.client = genai.Client(api_key=api_key)
 
     def response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -53,7 +54,30 @@ class GeminiAIClient(AIClient):
         # - Call client
         # - Print response to console
         # - Return ASSISTANT message
-        raise NotImplementedError
+        inputs = self._convert_msg(messages)
+        interaction = self.client.interactions.create(
+            model=self._model_name,
+            system_instruction=self._system_prompt,
+            input=inputs,
+            store=False
+        )
+        print("AI:", interaction.output_text)
+        return Message(Role.ASSISTANT, interaction.output_text)
+
+    def _convert_msg(self, messages: list[Message]) -> list[dict]:
+        inputs = list(map(lambda ms: ms.to_dict(), messages))
+        for message in inputs:
+            role = message.get("role")
+            text = message.get("content")
+            message["type"] = "user_input" if role == Role.USER else "model_output"
+            message["content"] = [
+                {
+                    "type": "text",
+                    "text": text
+                }
+            ]
+            del message["role"]
+        return inputs
 
     async def stream_response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -79,4 +103,20 @@ class GeminiAIClient(AIClient):
         # - Handle stream with chunks
         # - Print response to console
         # - Return ASSISTANT message
-        raise NotImplementedError
+        inputs = self._convert_msg(messages)
+        stream = await self.client.aio.interactions.create(
+            model=self._model_name,
+            input=inputs,
+            stream=True,
+            store=False
+            )
+        ai_content = ""
+        print("AI:", end="")
+        async for event in stream:
+            if event.event_type == "step.delta":
+                if event.delta.type == "text":
+                    ai_content += event.delta.text or ""
+                    print(event.delta.text, flush=True, end="")
+
+        print()
+        return Message(role=Role.ASSISTANT, content=ai_content)
