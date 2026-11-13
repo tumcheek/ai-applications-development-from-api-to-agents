@@ -1,7 +1,10 @@
 import base64
 from datetime import datetime
+import json
 
-from commons.constants import OPENAI_HOST
+import requests
+
+from commons.constants import OPENAI_API_KEY, OPENAI_HOST
 from t3_content_generation._openai_client import OpenAIClientT3
 
 
@@ -34,3 +37,26 @@ from t3_content_generation._openai_client import OpenAIClientT3
 #   - Use OpenAIClientT3 to connect to OpenAI API
 #   - Use /v1/images/generations endpoint
 #   - The image will be returned in base64 format
+headers = {
+    "Authorization": f"Bearer {OPENAI_API_KEY}",
+    "Content-type": "application/json"
+
+}
+
+data = json.dumps({
+    "model": "gpt-image-2.5-flare",
+    "prompt": "smiling catdog."
+})
+
+endpoint = f"{OPENAI_HOST}/v1/images/generations"
+
+response = requests.post(endpoint,headers=headers, data=data)
+payload = response.json()
+response.raise_for_status()
+new_name = f"new_catdog_{payload.get("created")}.png"
+new_file_path = f"t3_content_generation\\t2\{new_name}"
+image_base64 = payload["data"][0]["b64_json"]
+image_bytes = base64.b64decode(image_base64)
+
+with open(new_file_path, "wb") as f:
+    f.write(image_bytes)
