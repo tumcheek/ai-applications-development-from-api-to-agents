@@ -44,3 +44,27 @@ class Voice:
 #   - Use gpt-4o-mini-tts model
 
 
+headers = {
+    "Authorization": f"Bearer {OPENAI_API_KEY}",
+    "Content-type": "application/json"
+
+}
+
+data = json.dumps({
+    "model": "gpt-4o-mini-tts",
+    "input": "Why can't we say that black is white?",
+    "voice": Voice.coral,
+    "instructions": "Speak in a cheerful and positive tone."
+  }
+)
+
+endpoint = f'{OPENAI_HOST}/v1/audio/speech'
+
+response = requests.post(endpoint, data=data, headers=headers)
+
+response.raise_for_status()
+name = f"answer.mp3"
+file_path = f"t3_content_generation\\t4\{name}"
+
+with open(file_path, "wb") as f:
+    f.write(response.content)
